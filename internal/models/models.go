@@ -1,6 +1,19 @@
 package models
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+type OperationType string
+
+var ErrNoRecord = errors.New("models: подходящей записи не найдено")
+
+const (
+	subscribe_telegram OperationType = "subscribe_telegram"
+	follow_twitter     OperationType = "follow_twitter"
+	referral_signup    OperationType = "referral_signup"
+)
 
 type User struct {
 	ID        int       `json:"id"`
@@ -10,9 +23,9 @@ type User struct {
 }
 
 type Task struct {
-	ID     int    `json:"id"`
-	Name   string `json:"name"`
-	Reward int    `json:"reward"`
+	ID            int           `json:"id"`
+	OperationType OperationType `json:"operationType"`
+	Reward        int           `json:"reward"`
 }
 
 type UserTask struct {
