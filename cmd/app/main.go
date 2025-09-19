@@ -18,6 +18,7 @@ type application struct {
 	errorLog *log.Logger
 	infoLog  *log.Logger
 	rewards  *postgress.RewardRepository
+	jwt      string
 }
 
 func main() {
@@ -48,10 +49,13 @@ func main() {
 	db.SetMaxOpenConns(100)
 	defer db.Close()
 
+	jwtSecret := config.GetJWTSecret()
+
 	app := &application{
 		errorLog: errorLog,
 		infoLog:  infoLog,
 		rewards:  &postgress.RewardRepository{DB: db},
+		jwt:      jwtSecret,
 	}
 
 	srv := &http.Server{

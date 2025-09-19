@@ -31,3 +31,11 @@ func Load() (*Config, error) {
 	}
 	return cfg, nil
 }
+
+func GetJWTSecret() string {
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "fallback-secret-key-change-in-production"
+	}
+	return jwtSecret
+}

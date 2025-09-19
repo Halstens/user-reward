@@ -133,3 +133,30 @@ func (wr *RewardRepository) ProcessReferral(ctx context.Context, referrerID, ref
 
 	return tx.Commit()
 }
+
+func (wr *RewardRepository) GetUserByUsername(ctx context.Context, username string) (*UserWithAuth, error) {
+	query := `SELECT id, name, balance, password_hash 
+			  FROM users 
+			  WHERE name = $1`
+
+	row := wr.DB.QueryRowContext(ctx, query, username)
+
+	var user UserWithAuth
+	err := row.Scan(&user.ID, &user.Name, &user.Balance, &user.PasswordHash)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("user not found")
+		}
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	return &user, nil
+}
+
+type UserWithAuth struct {
+	ID           int
+	Name         string
+	Balance      int
+	PasswordHash string
+}

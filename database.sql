@@ -45,3 +45,9 @@ INSERT INTO users (name, balance) VALUES
 ('Bob Smith', 300),
 ('Charlie Brown', 75)
 ON CONFLICT DO NOTHING;
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);
+
+UPDATE users SET password_hash = 'password1' WHERE id = 1;
+UPDATE users SET password_hash = 'password1' WHERE id = 2;
+UPDATE users SET password_hash = 'password1' WHERE id = 3;  

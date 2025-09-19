@@ -8,8 +8,11 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/user-reward/internal/models"
 )
@@ -240,4 +243,64 @@ func (app *application) AddRefferer(w http.ResponseWriter, r *http.Request) {
 		"reward":        referralReward,
 		"new_balance":   referrer.Balance + referralReward,
 	})
+}
+
+func (app *application) Login(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		app.clientError(w, http.StatusMethodNotAllowed)
+		return
+	}
+
+	var request struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	user, err := app.rewards.GetUserByUsername(r.Context(), request.Username)
+	if err != nil {
+		app.clientError(w, http.StatusUnauthorized)
+		fmt.Println("Юзера нету")
+		return
+	}
+
+	if request.Password != user.PasswordHash {
+		app.clientError(w, http.StatusUnauthorized)
+		return
+	}
+
+	token := jwt.New(jwt.SigningMethodHS256)
+	claims := token.Claims.(jwt.MapClaims)
+	claims["userID"] = user.ID
+	claims["username"] = request.Username
+	claims["exp"] = time.Now().Add(time.Hour * 24).Unix()
+
+	tokenString, err := token.SignedString([]byte(app.jwt))
+	if err != nil {
+		app.serverError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"token":   tokenString,
+		"message": "Login successful",
+	})
+
+	// 	http.Error(w, `{"error": "Invalid credentials"}`, http.StatusUnauthorized)
+	// }
+}
+
+func HashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+	return string(bytes), err
+}
+
+func CheckPasswordHash(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
 }
