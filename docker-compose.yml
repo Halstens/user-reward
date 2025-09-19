@@ -32,7 +32,7 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - wallet-data:/var/lib/postgresql/data
+      - rewards-data:/var/lib/postgresql/data
       - ./database.sql:/docker-entrypoint-initdb.d/database.sql
     ports:
       - "5432:5433"
