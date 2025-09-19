@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/user-reward/internal/config"
-	"github.com/user-reward/internal/database/postgress"
+	postgress "github.com/user-reward/internal/database/postgres"
 	"github.com/user-reward/internal/repository"
 
 	_ "github.com/lib/pq"
@@ -17,7 +17,7 @@ import (
 type application struct {
 	errorLog *log.Logger
 	infoLog  *log.Logger
-	wallets  *postgress.WalletRepository
+	rewards  *postgress.RewardRepository
 }
 
 func main() {
@@ -51,7 +51,7 @@ func main() {
 	app := &application{
 		errorLog: errorLog,
 		infoLog:  infoLog,
-		wallets:  &postgress.WalletRepository{DB: db},
+		rewards:  &postgress.RewardRepository{DB: db},
 	}
 
 	srv := &http.Server{

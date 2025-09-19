@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +14,7 @@ import (
 
 func (app *application) ShowUserInfo(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.Header().Set("Allow: ", http.MethodPost)
+		w.Header().Set("Allow: ", http.MethodGet)
 		app.clientError(w, http.StatusMethodNotAllowed)
 		return
 	}
@@ -21,43 +23,7 @@ func (app *application) ShowUserInfo(w http.ResponseWriter, r *http.Request) {
 		app.notFound(w)
 		return
 	}
-
-}
-
-func (app *application) Transaction(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow: ", http.MethodPost)
-		app.clientError(w, http.StatusMethodNotAllowed)
-		return
-	}
-	var request models.WalletOperation
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
-	}
-
-	if request.Amount <= 0 {
-		http.Error(w, "Error of amount", http.StatusBadRequest)
-		return
-	}
-
-	err := app.wallets.UpdateBalanceWithRetry(request.WalletID, int(request.Amount), request.OperationType, 5)
-	if err != nil {
-		app.serverError(w, err)
-	}
-
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
-}
-
-func (app *application) showBalance(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	fmt.Println(id)
-	if len([]rune(id)) == 0 {
-		app.notFound(w)
-		return
-	}
-	s, err := app.wallets.GetBalance(id)
+	info, err := app.rewards.GetUserById(id)
 	if err != nil {
 		if errors.Is(err, models.ErrNoRecord) {
 			app.notFound(w)
@@ -67,5 +33,200 @@ func (app *application) showBalance(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]int64{"balance": s})
+	json.NewEncoder(w).Encode(info)
+
+}
+
+func (app *application) ShowTopUserByBalance(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow: ", http.MethodGet)
+		app.clientError(w, http.StatusMethodNotAllowed)
+		return
+	}
+	topList, err := app.rewards.GetTopList()
+	if err != nil {
+		if errors.Is(err, models.ErrNoRecord) {
+			app.notFound(w)
+		} else {
+			app.serverError(w, err)
+			fmt.Println("Не найдено")
+		}
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(topList)
+
+}
+
+func (app *application) CompletedTask(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow: ", http.MethodPost)
+		app.clientError(w, http.StatusMethodNotAllowed)
+		return
+	}
+	id, err := strconv.Atoi(r.URL.Query().Get("id"))
+	if err != nil || id < 1 {
+		app.notFound(w)
+		return
+	}
+	var request struct {
+		TaskType string `json:"task_type"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	validTasks := map[string]int{
+		"subscribe_telegram": 50,
+		"follow_twitter":     30,
+		"referral_signup":    100,
+	}
+	reward, exists := validTasks[request.TaskType]
+	if !exists {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	user, err := app.rewards.GetUserById(id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			app.notFound(w)
+		} else {
+			app.serverError(w, err)
+		}
+		return
+	}
+
+	alreadyCompleted, err := app.rewards.IsTaskCompleted(r.Context(), id, request.TaskType)
+	if err != nil {
+		app.serverError(w, err)
+		return
+	}
+
+	if alreadyCompleted {
+		app.clientError(w, http.StatusConflict)
+		return
+	}
+
+	err = app.rewards.UpdateUserBalance(id, reward, models.OperationType(request.TaskType))
+	if err != nil {
+		app.serverError(w, err)
+		return
+	}
+
+	err = app.rewards.MarkTaskCompleted(r.Context(), id, request.TaskType)
+	if err != nil {
+		app.serverError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":     true,
+		"message":     "Task completed successfully",
+		"reward":      reward,
+		"new_balance": user.Balance + reward,
+		"task_type":   request.TaskType,
+	})
+
+}
+
+func (app *application) isReferralExists(ctx context.Context, refereeID int) (bool, error) {
+	return app.rewards.IsReferralExists(ctx, refereeID)
+}
+
+func (app *application) processReferral(ctx context.Context, refereeID, referrerID, reward int) error {
+	return app.rewards.ProcessReferral(ctx, referrerID, refereeID, reward)
+}
+
+func (app *application) AddRefferer(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow: ", http.MethodPost)
+		app.clientError(w, http.StatusMethodNotAllowed)
+		return
+	}
+	id, err := strconv.Atoi(r.URL.Query().Get("id"))
+	if err != nil || id < 1 {
+		app.notFound(w)
+		return
+	}
+	var request struct {
+		ReferrerID int `json:"referrer_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	// Валидация
+	if request.ReferrerID <= 0 {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	// Нельзя указать самого себя как реферера
+	if id == request.ReferrerID {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	// Проверяем, существует ли реферер
+	referrer, err := app.rewards.GetUserById(request.ReferrerID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			app.clientError(w, http.StatusNotFound)
+		} else {
+			app.serverError(w, err)
+		}
+		return
+	}
+
+	// Проверяем, существует ли реферал
+	_, erro := app.rewards.GetUserById(id)
+	if erro != nil {
+		if erro == sql.ErrNoRows {
+			app.clientError(w, http.StatusNotFound)
+		} else {
+			app.serverError(w, erro)
+		}
+		return
+	}
+
+	// Проверяем, не добавлен ли уже реферер для этого пользователя
+	alreadyReferred, err := app.isReferralExists(r.Context(), id)
+	if err != nil {
+		app.serverError(w, err)
+		return
+	}
+
+	if alreadyReferred {
+		app.clientError(w, http.StatusConflict)
+		return
+	}
+
+	// Награда за реферала
+	referralReward := 100
+
+	// Выполняем в транзакции
+	err = app.processReferral(r.Context(), id, request.ReferrerID, referralReward)
+	if err != nil {
+		app.serverError(w, err)
+		return
+	}
+
+	// Успешный ответ
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":       true,
+		"message":       "Referrer added successfully",
+		"referrer_id":   request.ReferrerID,
+		"referrer_name": referrer.Name,
+		"reward":        referralReward,
+		"new_balance":   referrer.Balance + referralReward,
+	})
 }
