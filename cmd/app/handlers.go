@@ -36,7 +36,6 @@ func (app *application) ShowUserInfo(w http.ResponseWriter, r *http.Request) {
 			app.notFound(w)
 		} else {
 			app.serverError(w, err)
-			fmt.Println("Не найдено", id)
 		}
 		return
 	}
@@ -56,7 +55,6 @@ func (app *application) ShowTopUserByBalance(w http.ResponseWriter, r *http.Requ
 			app.notFound(w)
 		} else {
 			app.serverError(w, err)
-			fmt.Println("Не найдено")
 		}
 		return
 	}
@@ -75,7 +73,6 @@ func (app *application) CompletedTask(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil || id < 1 {
 		app.notFound(w)
-		fmt.Println("Нет ид")
 		return
 	}
 	var request struct {
@@ -161,7 +158,6 @@ func (app *application) AddRefferer(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil || id < 1 {
 		app.notFound(w)
-		fmt.Println("Нет ид")
 		return
 	}
 	var request struct {
@@ -170,20 +166,17 @@ func (app *application) AddRefferer(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		app.clientError(w, http.StatusBadRequest)
-		fmt.Println("1", request.ReferrerID)
 		return
 	}
 
 	//Валидация
 	if request.ReferrerID <= 0 {
 		app.clientError(w, http.StatusBadRequest)
-		fmt.Println("2", request.ReferrerID)
 		return
 	}
 
 	if id == request.ReferrerID {
 		app.clientError(w, http.StatusBadRequest)
-		fmt.Println("3", request.ReferrerID)
 		return
 	}
 
@@ -257,7 +250,6 @@ func (app *application) Login(w http.ResponseWriter, r *http.Request) {
 	user, err := app.rewards.GetUserByUsername(r.Context(), request.Username)
 	if err != nil {
 		app.clientError(w, http.StatusUnauthorized)
-		fmt.Println("Юзера нету")
 		return
 	}
 

@@ -115,7 +115,7 @@ func (wr *RewardRepository) ProcessReferral(ctx context.Context, referrerID, ref
 		return fmt.Errorf("failed to create referral: %w", err)
 	}
 
-	// Начисляем награду рефереру
+	//Начисляем награду рефереру
 	_, err = tx.ExecContext(ctx,
 		`UPDATE users SET balance = balance + $1 WHERE id = $2`,
 		reward, referrerID)
@@ -123,7 +123,7 @@ func (wr *RewardRepository) ProcessReferral(ctx context.Context, referrerID, ref
 		return fmt.Errorf("failed to update referrer balance: %w", err)
 	}
 
-	// Отмечаем задание "referral_signup" как выполненное для реферала
+	//Отмечаем задание "referral_signup" как выполненное для реферала
 	_, err = tx.ExecContext(ctx,
 		`INSERT INTO completed_tasks (user_id, task_type) VALUES ($1, 'referral_signup')`,
 		refereeID)
