@@ -15,7 +15,7 @@ type RewardRepository struct {
 
 func (wr *RewardRepository) GetUserById(id int) (*models.User, error) {
 	stmt := `SELECT id, name, balance, created_at FROM users
-		WHERE id = ?`
+		WHERE id = $1`
 	row := wr.DB.QueryRow(stmt, id)
 	user := &models.User{}
 	err := row.Scan(&user.ID, &user.Name, &user.Balance, &user.CreatedAt)
