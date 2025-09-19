@@ -174,21 +174,19 @@ func (app *application) AddRefferer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Валидация
+	//Валидация
 	if request.ReferrerID <= 0 {
 		app.clientError(w, http.StatusBadRequest)
 		fmt.Println("2", request.ReferrerID)
 		return
 	}
 
-	// Нельзя указать самого себя как реферера
 	if id == request.ReferrerID {
 		app.clientError(w, http.StatusBadRequest)
 		fmt.Println("3", request.ReferrerID)
 		return
 	}
 
-	// Проверяем, существует ли реферер
 	referrer, err := app.rewards.GetUserById(request.ReferrerID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -199,7 +197,6 @@ func (app *application) AddRefferer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Проверяем, существует ли реферал
 	_, erro := app.rewards.GetUserById(id)
 	if erro != nil {
 		if erro == sql.ErrNoRows {
@@ -210,7 +207,6 @@ func (app *application) AddRefferer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Проверяем, не добавлен ли уже реферер для этого пользователя
 	alreadyReferred, err := app.isReferralExists(r.Context(), id)
 	if err != nil {
 		app.serverError(w, err)
@@ -222,17 +218,14 @@ func (app *application) AddRefferer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Награда за реферала
 	referralReward := 100
 
-	// Выполняем в транзакции
 	err = app.processReferral(r.Context(), id, request.ReferrerID, referralReward)
 	if err != nil {
 		app.serverError(w, err)
 		return
 	}
 
-	// Успешный ответ
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -291,8 +284,6 @@ func (app *application) Login(w http.ResponseWriter, r *http.Request) {
 		"message": "Login successful",
 	})
 
-	// 	http.Error(w, `{"error": "Invalid credentials"}`, http.StatusUnauthorized)
-	// }
 }
 
 func HashPassword(password string) (string, error) {
